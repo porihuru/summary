@@ -270,28 +270,48 @@
     }
 
     on("btnLogin", function(){
-      hideMsg();
+  hideMsg();
+  lockAll();
+
+  // ★これを追加★：入力欄から email/pass を取得して signIn(email, pass) する
+  var email = ($( "txtLoginEmail") && $("txtLoginEmail").value) ? $("txtLoginEmail").value.trim() : "";
+  var pass  = ($( "txtLoginPass")  && $("txtLoginPass").value)  ? $("txtLoginPass").value : "";
+
+  if(!email){
+    msg("err", "ログイン失敗", "ログインメールを入力してください。");
+    lockAll();
+    refreshAuthUI();
+    return Promise.resolve(false);
+  }
+  if(!pass){
+    msg("err", "ログイン失敗", "パスワードを入力してください。");
+    lockAll();
+    refreshAuthUI();
+    return Promise.resolve(false);
+  }
+  // ★ここまで追加★
+
+  return window.SummaryAuth.signIn(email, pass).then(function(){
+    msg("ok","ログイン成功","ログインしました。");
+    return checkRole();
+  }).then(function(res){
+    if(res && res.allowed){
+      msg("ok","権限OK","role=" + (res.role||"-"));
+      unlockOps();
+    }else{
+      // role NG
       lockAll();
-      return window.SummaryAuth.signIn().then(function(){
-        msg("ok","ログイン成功","ログインしました。");
-        return checkRole();
-      }).then(function(res){
-        if(res && res.allowed){
-          msg("ok","権限OK","role=" + (res.role||"-"));
-          unlockOps();
-        }else{
-          // role NG
-          lockAll();
-        }
-        refreshAuthUI();
-        return true;
-      }).catch(function(e){
-        msg("err","ログイン失敗", toStr(e));
-        lockAll();
-        refreshAuthUI();
-        throw e;
-      });
-    });
+    }
+    refreshAuthUI();
+    return true;
+  }).catch(function(e){
+    msg("err","ログイン失敗", toStr(e));
+    lockAll();
+    refreshAuthUI();
+    throw e;
+  });
+});
+
 
     on("btnLogout", function(){
       hideMsg();
