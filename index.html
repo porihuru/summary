@@ -208,6 +208,17 @@
       <div class="row">
         <div class="col">
           <div class="hint"><b>1) ログイン</b>（admin/ope）</div>
+
+  <!-- 1/25 ★これを追加★：ログイン入力欄（admin/ope） -->
+  <label>ログインメール（admin/ope）</label>
+  <input id="txtLoginEmail" type="email" autocomplete="username" inputmode="email" placeholder="例: admin@example.com" />
+
+  <label>パスワード</label>
+  <input id="txtLoginPass" type="password" autocomplete="current-password" placeholder="パスワード" />
+  <!-- 1/25 ★ここまで追加★ -->
+
+
+          
           <div class="btnRow" style="margin-top:10px;">
             <button id="btnLogin" type="button">ログイン</button>
             <button id="btnLogout" type="button" class="secondary">ログアウト</button>
