@@ -1,13 +1,26 @@
 <!--
-[JST 2026-01-25 11:05]  summary/index.html v20260125-01
-入札 集計（admin/ope専用） ※bidder側は変更しない
-要件:
-  - admin/opeログイン必須（users/{uid}.role を参照）
+[JST 2026-01-25 11:30]  summary/index.html v20260125-01
+入札 集計（summary側 / admin・ope専用）
+方針:
+  - bidder側は一切修正しない（別フォルダ運用）
+  - summary側は機能ごとにJS分割（00〜12）
+  - 画面下部に「JSバージョン一覧」と「詳細ログ」を常設表示
   - 単価契約：合計は一切出さない
-  - 最安判定：数値化できたものだけ比較（空欄/文字除外）、小数OK、同額最安は全ハイライト
-  - 入札者表示：bidderId + profile.companyName
-  - file://想定（Edge95配慮）
+  - 最安判定：数値化できた単価のみ、小数OK、同額最安は全ハイライト
+
+UI構成:
+  [UI-01] ログイン（admin/ope）
+  [UI-02] 対象bidNo入力 + 再読込/CSV/印刷
+  [UI-03] 集計テーブル（左固定 + 入札者列動的生成）
+  [UI-04] メッセージボックス（成功/失敗/理由）
+  [UI-05] 詳細ログ（操作の都度ログ）
+  [UI-06] 読み込まれたJSバージョン一覧（window.__APP_VER__ 集計）
+
+注意:
+  - JSは別ファイルで順次作成する（このindexは土台のみ）
+  - Edge95想定（特殊な最新機能に依存しない）
 -->
+
 <!doctype html>
 <html lang="ja">
 <head>
@@ -17,22 +30,39 @@
 
   <style>
     :root{
-      --bg:#f6f7fb; --card:#fff; --border:#e5e7eb; --text:#111827; --muted:#6b7280;
-      --danger:#b91c1c; --ok:#047857;
-      --btn:#111827; --btnText:#fff; --btn2:#e5e7eb; --btn2Text:#111827;
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --border:#e5e7eb;
+      --text:#111827;
+      --muted:#6b7280;
+      --danger:#b91c1c;
+      --ok:#047857;
 
-      --minBg:#fff7ed; --minBd:#fb923c;
+      --btn:#111827;
+      --btnText:#ffffff;
+      --btn2:#e5e7eb;
+      --btn2Text:#111827;
+
+      --minBg:#fff7ed;
+      --minBd:#fb923c;
       --naBg:#f3f4f6;
     }
+
     body{ margin:0; background:var(--bg); color:var(--text);
       font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; }
-    .wrap{ max-width:1400px; margin:0 auto; padding:14px; }
+
+    .wrap{ max-width:1200px; margin:0 auto; padding:14px; }
+
     .topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .title{ font-size:20px; font-weight:700; }
     .ver{ font-size:12px; color:var(--muted); }
-    .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-top:10px; }
+
+    .card{ background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:12px; margin-top:10px; }
+
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
     .col{ flex:1; min-width:260px; }
+
     .btnRow{ display:flex; gap:8px; flex-wrap:wrap; }
     button{
       border:0; border-radius:10px; padding:10px 12px; font-size:14px;
@@ -40,26 +70,25 @@
     }
     button.secondary{ background:var(--btn2); color:var(--btn2Text); }
     button:disabled{ opacity:.5; cursor:not-allowed; }
-    input{
+
+    input, textarea{
       width:100%; box-sizing:border-box;
       border:1px solid var(--border); border-radius:10px;
       padding:10px 10px; font-size:14px; background:#fff;
     }
     label{ display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
     .hint{ font-size:12px; color:var(--muted); }
+
     .err{ border:1px solid #fecaca; background:#fff1f2; color:var(--danger); padding:10px; border-radius:10px; }
-    .ok{ border:1px solid #a7f3d0; background:#ecfdf5; color:var(--ok); padding:10px; border-radius:10px; }
+    .ok { border:1px solid #a7f3d0; background:#ecfdf5; color:var(--ok); padding:10px; border-radius:10px; }
+
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
+    /* [UI-03] 集計テーブル */
     .tableWrap{ overflow:auto; border:1px solid var(--border); border-radius:12px; }
     table{ width:max-content; min-width:100%; border-collapse:collapse; background:#fff; }
     th, td{ border-bottom:1px solid var(--border); padding:10px 8px; font-size:13px; vertical-align:top; }
-    th{
-      position:sticky; top:0; background:#fff; z-index:2;
-      text-align:left; color:var(--muted); font-weight:600;
-    }
-
-    /* 左2列固定（横スクロールでも見える） */
+    th{ position:sticky; top:0; background:#fff; z-index:2; text-align:left; color:var(--muted); font-weight:600; }
     th.stickyL, td.stickyL{ position:sticky; left:0; background:#fff; z-index:3; }
     th.stickyL2, td.stickyL2{ position:sticky; left:70px; background:#fff; z-index:3; }
 
@@ -67,6 +96,7 @@
     .td2line{ line-height:1.35; white-space:normal; min-width:240px; }
     .td2line .sub{ color:var(--muted); font-size:12px; margin-top:4px; display:block; }
 
+    /* [RENDER-xx] CSSクラスはJSから付与 */
     .cell-min{ background:var(--minBg); outline:2px solid var(--minBd); outline-offset:-2px; font-weight:700; }
     .cell-na{ background:var(--naBg); color:var(--muted); }
     .cell-empty{ color:var(--muted); }
@@ -74,7 +104,11 @@
     .footer{ margin-top:10px; font-size:12px; color:var(--muted); }
   </style>
 
-  <!-- Firebase compat SDK -->
+  <!-- =========================================================
+       [FB-01] Firebase compat SDK（summary側もFirebaseを使う）
+       - bidder側とは別フォルダのため、summary側で読み込む
+       - バージョンは bidder側に合わせて 9.23.0 を採用
+     ========================================================= -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -82,23 +116,40 @@
 
 <body>
   <div class="wrap">
+
+    <!-- =========================================================
+         [UI-00] ヘッダ
+       ========================================================= -->
     <div class="topbar">
       <div class="title">入札 集計（admin/ope専用）</div>
       <div class="ver mono" id="lblPageVer">v20260125-01</div>
     </div>
 
-    <!-- 1) ログイン -->
+    <!-- =========================================================
+         [UI-04] メッセージ（成功/失敗/理由）
+         - showMsg/hideMsg は 03_summary_msg.js が担当
+       ========================================================= -->
+    <div class="card" id="msgBox" style="display:none;"></div>
+
+    <!-- =========================================================
+         [UI-01] ログイン（admin/ope）
+         - ログイン処理は 04_summary_auth.js
+         - role判定は 05_summary_role.js
+       ========================================================= -->
     <div class="card">
       <div class="hint"><b>1) admin / ope ログイン（必須）</b></div>
+
       <div class="row">
         <div class="col">
           <label>メールアドレス</label>
           <input id="txtAdminEmail" type="email" autocomplete="username" />
         </div>
+
         <div class="col">
           <label>パスワード</label>
           <input id="txtAdminPass" type="password" autocomplete="current-password" />
         </div>
+
         <div class="col" style="min-width:220px;">
           <div class="btnRow" style="margin-top:20px;">
             <button id="btnAdminLogin" type="button">ログイン</button>
@@ -108,18 +159,20 @@
       </div>
 
       <div class="hint" style="margin-top:8px;">
-        状態: <span class="mono" id="lblLoginState">SIGNED-OUT</span> /
-        role: <span class="mono" id="lblRole">-</span> /
-        権限: <span class="mono" id="lblAuthz">NG</span>
+        状態: <span id="lblLoginState">SIGNED-OUT</span> /
+        role: <span id="lblRole">-</span> /
+        権限: <span id="lblAuthz">NG</span>
       </div>
     </div>
 
-    <!-- メッセージ -->
-    <div class="card" id="msgBox" style="display:none;"></div>
-
-    <!-- 2) 対象入札 -->
+    <!-- =========================================================
+         [UI-02] 対象bidNo + 操作
+         - 再読込/CSV/印刷は 12_summary_app.js が結線
+         - 合計は表示しない（単価契約）
+       ========================================================= -->
     <div class="card">
-      <div class="hint"><b>2) 対象入札の集計</b>（単価契約：合計は出しません）</div>
+      <div class="hint"><b>2) 対象入札の集計</b>（単価契約：合計は一切出しません）</div>
+
       <div class="row">
         <div class="col">
           <label>入札番号（bidNo）</label>
@@ -128,11 +181,12 @@
             URLの <span class="mono">?bidNo=XXXX</span> があれば優先。無ければ入力値を使用。
           </div>
         </div>
-        <div class="col" style="min-width:260px;">
+
+        <div class="col" style="min-width:320px;">
           <div class="btnRow" style="margin-top:28px;">
-            <button id="btnLoad" type="button" class="secondary">再読込</button>
-            <button id="btnCsv" type="button" class="secondary">CSV出力</button>
-            <button id="btnPrint" type="button" class="secondary">印刷</button>
+            <button id="btnLoad" type="button" class="secondary" disabled>再読込</button>
+            <button id="btnCsv"  type="button" class="secondary" disabled>CSV出力</button>
+            <button id="btnPrint" type="button" class="secondary" disabled>印刷</button>
           </div>
         </div>
       </div>
@@ -142,31 +196,115 @@
       </div>
     </div>
 
-    <!-- 3) 集計結果 -->
+    <!-- =========================================================
+         [UI-03] 集計テーブル
+         - ヘッダ/ボディ生成は 09_summary_render.js
+       ========================================================= -->
     <div class="card">
       <div class="hint"><b>3) 集計結果</b></div>
+
       <div class="tableWrap" style="margin-top:8px;">
         <table id="tblSummary">
           <thead id="theadSummary">
             <tr>
               <th class="stickyL" style="width:70px;">番号</th>
               <th class="stickyL2" style="min-width:260px;">品名／規格</th>
-              <th style="min-width:120px;">予定数量</th>
-              <th style="min-width:160px;">（入札者列は読込後に生成）</th>
+              <th style="min-width:110px;">予定数量</th>
+              <th>（入札者列は読込後に生成）</th>
             </tr>
           </thead>
+
           <tbody id="tbodySummary">
-            <tr><td colspan="4" class="mono" style="color:#6b7280;">未読込</td></tr>
+            <tr>
+              <td colspan="4" class="mono" style="color:#6b7280;">未読込</td>
+            </tr>
           </tbody>
         </table>
       </div>
+
+      <div class="hint" style="margin-top:8px;">
+        表の左2列は固定表示（スクロールしても「番号」「品名／規格」を追従）。
+      </div>
     </div>
 
-    <div class="footer mono" id="lblFooter"></div>
+    <!-- =========================================================
+         [UI-05] 詳細ログ
+         - ログは 01_summary_boot.js / 12_summary_app.js など全域から出す
+       ========================================================= -->
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <div class="hint"><b>ログ</b>　操作のたびに成功/失敗/理由を必ず記録します。</div>
+        <div class="btnRow">
+          <button id="btnLogClear" type="button" class="secondary">ログクリア</button>
+          <button id="btnLogPause" type="button" class="secondary">ログ停止</button>
+          <button id="btnLogCopy" type="button" class="secondary">ログコピー</button>
+        </div>
+      </div>
+
+      <textarea id="txtLog" class="mono" readonly style="margin-top:8px;height:220px;"></textarea>
+
+      <div class="hint" style="margin-top:6px;">
+        ログ欄を操作しやすいよう、タップ時にログ停止する仕様にします（コピー/選択を邪魔しません）。
+      </div>
+    </div>
+
+    <!-- =========================================================
+         [UI-06] JSバージョン一覧（読み込まれたものだけ）
+         - 各JSが window.__APP_VER__.push({ts,file,ver}) を行う
+         - 12_summary_app.js が #preVerList に集計表示
+       ========================================================= -->
+    <div class="footer">
+      <div><b>JSバージョン</b></div>
+      <pre id="preVerList" class="mono" style="white-space:pre-wrap;margin:6px 0 0 0;"></pre>
+
+      <div class="mono" id="lblFooterInfo" style="margin-top:6px;"></div>
+    </div>
+
   </div>
 
-  <!-- summary側だけで完結（/shared/なし） -->
+  <!-- =========================================================
+       [JS-LOAD] summary側：機能ごとの個別JS（00→12の順）
+       ※ このindex作成時点ではファイル未作成でもOK（次回以降こちらが順に提示）
+     ========================================================= -->
+
+  <!-- [00] ENV: Firebase設定 -->
   <script src="js/00_summary_env.js"></script>
-  <script src="js/20_summary_app.js"></script>
+
+  <!-- [01] BOOT: 最速ロガー/起動土台 -->
+  <script src="js/01_summary_boot.js"></script>
+
+  <!-- [02] DOM: DOMユーティリティ/エスケープ等 -->
+  <script src="js/02_summary_dom.js"></script>
+
+  <!-- [03] MSG: メッセージボックス制御 -->
+  <script src="js/03_summary_msg.js"></script>
+
+  <!-- [04] AUTH: Firebase Auth ログイン/ログアウト -->
+  <script src="js/04_summary_auth.js"></script>
+
+  <!-- [05] ROLE: users/{uid}.role 判定（admin/opeのみ許可） -->
+  <script src="js/05_summary_role.js"></script>
+
+  <!-- [06] FS: Firestore 読込API（bids/items/offers） -->
+  <script src="js/06_summary_fs.js"></script>
+
+  <!-- [07] PARSE: 単価の数値化（小数OK/カンマ/全角対応） -->
+  <script src="js/07_summary_parse.js"></script>
+
+  <!-- [08] CALC: 最安判定（同額最安対応） -->
+  <script src="js/08_summary_calc.js"></script>
+
+  <!-- [09] RENDER: テーブル描画 -->
+  <script src="js/09_summary_render.js"></script>
+
+  <!-- [10] EXPORT: CSV/印刷（合計なし） -->
+  <script src="js/10_summary_export.js"></script>
+
+  <!-- [11] STATE: 画面状態管理（bidNo/items/bidders等） -->
+  <script src="js/11_summary_state.js"></script>
+
+  <!-- [12] APP: 画面イベント結線（再読込/CSV/印刷/ログ） -->
+  <script src="js/12_summary_app.js"></script>
+
 </body>
 </html>
