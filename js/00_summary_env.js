@@ -7,11 +7,15 @@
   // ★ここだけあなたの Firebase プロジェクト実値に差し替え★
   window.SummaryEnv = {
     FIREBASE_CONFIG: {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      appId: "YOUR_APP_ID"
-      // 必要なら: storageBucket, messagingSenderId などを追加
+  
+  apiKey: "AIzaSyAAinuBPDNjxQ63TEgDnRjP2pfWIXRBrQ0",
+  authDomain: "bidding-920b8.firebaseapp.com",
+  projectId: "bidding-920b8",
+  storageBucket: "bidding-920b8.firebasestorage.app",
+  messagingSenderId: "554171859200",
+  appId: "1:554171859200:web:1b1412a6a8c57fc9a4f3e5",
+  measurementId: "G-HC01P1974L"
+       
     }
   };
 })();
