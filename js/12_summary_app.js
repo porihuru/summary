@@ -36,7 +36,7 @@
   // [APP-00] ファイル情報（バージョン一覧用）
   // ============================================================================
   var FILE = "12_summary_app.js";
-  var VER  = "v20260125-01";
+  var VER  = "v20260125-02";
   var TS   = (function(){ try{ return new Date().toISOString(); }catch(e){ return ""; } })();
 
   if(!window.__APP_VER__){ window.__APP_VER__ = []; }
