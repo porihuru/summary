@@ -1,218 +1,172 @@
 <!--
-[JST 2026-01-25 10:00]  summary/index.html v20260125-01
-入札後集計（単価契約 / 合計一切なし / 最安ハイライト・同額最安対応）
+[JST 2026-01-25 11:05]  summary/index.html v20260125-01
+入札 集計（admin/ope専用） ※bidder側は変更しない
 要件:
-  - bids/{bidNo}, items, offers を読み込み
-  - 合計(数量×単価/総額/参考額)は一切出さない（表示もCSVも）
-  - 数値化できた単価のみで最安判定（小数OK）
-  - 入札者表示: companyName（bidderId）/ 無ければ bidderId
-  - 入札者は全品目に単価を入れない前提（欠けOK）
-  - Edge95想定（古い環境フォールバック含む）
+  - admin/opeログイン必須（users/{uid}.role を参照）
+  - 単価契約：合計は一切出さない
+  - 最安判定：数値化できたものだけ比較（空欄/文字除外）、小数OK、同額最安は全ハイライト
+  - 入札者表示：bidderId + profile.companyName
+  - file://想定（Edge95配慮）
 -->
 <!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>入札集計（単価契約）</title>
+  <title>入札 集計（admin/ope専用）</title>
+
   <style>
     :root{
-      --bg:#f6f7fb;
-      --card:#ffffff;
-      --border:#e5e7eb;
-      --text:#111827;
-      --muted:#6b7280;
-      --danger:#b91c1c;
-      --ok:#047857;
-      --btn:#111827;
-      --btnText:#ffffff;
-      --btn2:#e5e7eb;
-      --btn2Text:#111827;
-      --hi:#fff7ed;     /* 最安セルの背景（控えめ） */
-      --hi2:#ffedd5;    /* 最安セル（同額最安も同じ扱い） */
+      --bg:#f6f7fb; --card:#fff; --border:#e5e7eb; --text:#111827; --muted:#6b7280;
+      --danger:#b91c1c; --ok:#047857;
+      --btn:#111827; --btnText:#fff; --btn2:#e5e7eb; --btn2Text:#111827;
+
+      --minBg:#fff7ed; --minBd:#fb923c;
+      --naBg:#f3f4f6;
     }
     body{ margin:0; background:var(--bg); color:var(--text);
       font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; }
-    .wrap{ max-width:1200px; margin:0 auto; padding:14px; }
+    .wrap{ max-width:1400px; margin:0 auto; padding:14px; }
     .topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .title{ font-size:20px; font-weight:700; }
     .ver{ font-size:12px; color:var(--muted); }
     .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-top:10px; }
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .kvs{ font-size:14px; line-height:1.6; color:var(--text); }
-    .kvs .m{ color:var(--muted); }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .col{ flex:1; min-width:260px; }
     .btnRow{ display:flex; gap:8px; flex-wrap:wrap; }
     button{
       border:0; border-radius:10px; padding:10px 12px; font-size:14px;
       background:var(--btn); color:var(--btnText); cursor:pointer;
     }
     button.secondary{ background:var(--btn2); color:var(--btn2Text); }
-    button.danger{ background:#ef4444; color:#fff; }
     button:disabled{ opacity:.5; cursor:not-allowed; }
     input{
+      width:100%; box-sizing:border-box;
       border:1px solid var(--border); border-radius:10px;
       padding:10px 10px; font-size:14px; background:#fff;
     }
-    label{ font-size:12px; color:var(--muted); }
+    label{ display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
     .hint{ font-size:12px; color:var(--muted); }
     .err{ border:1px solid #fecaca; background:#fff1f2; color:var(--danger); padding:10px; border-radius:10px; }
     .ok{ border:1px solid #a7f3d0; background:#ecfdf5; color:var(--ok); padding:10px; border-radius:10px; }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-    /* テーブル */
-    .tblwrap{ overflow:auto; border:1px solid var(--border); border-radius:10px; }
-    table{ width:100%; border-collapse:collapse; min-width:980px; }
-    th, td{ border-bottom:1px solid var(--border); padding:10px 6px; font-size:13px; vertical-align:top; }
-    th{ text-align:left; color:var(--muted); font-weight:600; background:#fafafa; position:sticky; top:0; z-index:2; }
-    td{ background:#fff; }
-    .td2line{ line-height:1.35; }
-    .td2line .sub{ color:var(--muted); font-size:12px; margin-top:4px; display:block; }
-    .mincell{ background:var(--hi); font-weight:700; }
-    .mincell.tie{ background:var(--hi2); }
-    .empty{ color:var(--muted); }
-
-    /* 印刷 */
-    @media print{
-      body{ background:#fff; }
-      .wrap{ max-width:none; padding:0; }
-      .noprint{ display:none !important; }
-      .card{ border:0; border-radius:0; margin-top:6px; padding:8px; }
-      th{ position:static; }
-      .tblwrap{ border:0; }
-      table{ min-width:0; }
+    .tableWrap{ overflow:auto; border:1px solid var(--border); border-radius:12px; }
+    table{ width:max-content; min-width:100%; border-collapse:collapse; background:#fff; }
+    th, td{ border-bottom:1px solid var(--border); padding:10px 8px; font-size:13px; vertical-align:top; }
+    th{
+      position:sticky; top:0; background:#fff; z-index:2;
+      text-align:left; color:var(--muted); font-weight:600;
     }
+
+    /* 左2列固定（横スクロールでも見える） */
+    th.stickyL, td.stickyL{ position:sticky; left:0; background:#fff; z-index:3; }
+    th.stickyL2, td.stickyL2{ position:sticky; left:70px; background:#fff; z-index:3; }
+
+    td{ white-space:nowrap; }
+    .td2line{ line-height:1.35; white-space:normal; min-width:240px; }
+    .td2line .sub{ color:var(--muted); font-size:12px; margin-top:4px; display:block; }
+
+    .cell-min{ background:var(--minBg); outline:2px solid var(--minBd); outline-offset:-2px; font-weight:700; }
+    .cell-na{ background:var(--naBg); color:var(--muted); }
+    .cell-empty{ color:var(--muted); }
+
+    .footer{ margin-top:10px; font-size:12px; color:var(--muted); }
   </style>
 
-  <!-- =========================================================
-       [BOOT-01] Firebase compat SDK（bidderと同じ方式）
-     ========================================================= -->
+  <!-- Firebase compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- =========================================================
-       [CFG-01] 既存 bidder の config を流用（FIREBASE_CONFIG等）
-       - 既存：/js/01_bidder_config.js が存在する前提
-       - summary/ 配下から ../js を参照
-     ========================================================= -->
-  <script src="../js/01_bidder_config.js"></script>
 </head>
 
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div class="title">入札集計（単価契約）</div>
+      <div class="title">入札 集計（admin/ope専用）</div>
       <div class="ver mono" id="lblPageVer">v20260125-01</div>
     </div>
 
-    <!-- 状態表示 -->
+    <!-- 1) ログイン -->
     <div class="card">
-      <div class="kvs">
-        <div>
-          <span class="m">入札番号:</span> <span id="lblBidNo">-</span>
-          <span class="m" style="margin-left:10px;">状態:</span> <span id="lblBidStatus">-</span>
-          <span class="m" style="margin-left:10px;">最終読込:</span> <span id="lblLastLoadedAt">-</span>
+      <div class="hint"><b>1) admin / ope ログイン（必須）</b></div>
+      <div class="row">
+        <div class="col">
+          <label>メールアドレス</label>
+          <input id="txtAdminEmail" type="email" autocomplete="username" />
         </div>
-        <div class="hint">
-          単価契約のため、合計金額（数量×単価／総額／参考額）は一切表示しません。
+        <div class="col">
+          <label>パスワード</label>
+          <input id="txtAdminPass" type="password" autocomplete="current-password" />
         </div>
+        <div class="col" style="min-width:220px;">
+          <div class="btnRow" style="margin-top:20px;">
+            <button id="btnAdminLogin" type="button">ログイン</button>
+            <button id="btnAdminLogout" type="button" class="secondary">ログアウト</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint" style="margin-top:8px;">
+        状態: <span class="mono" id="lblLoginState">SIGNED-OUT</span> /
+        role: <span class="mono" id="lblRole">-</span> /
+        権限: <span class="mono" id="lblAuthz">NG</span>
       </div>
     </div>
 
-    <!-- 操作（印刷やCSVは noprint ） -->
-    <div class="card noprint">
-      <div class="row" style="justify-content:space-between;">
-        <div class="row" style="gap:10px;">
-          <div>
-            <label>入札番号（URL優先: ?bidNo=XXXX）</label><br>
-            <input id="txtBidNo" type="text" placeholder="例: 2026002" style="width:180px;">
+    <!-- メッセージ -->
+    <div class="card" id="msgBox" style="display:none;"></div>
+
+    <!-- 2) 対象入札 -->
+    <div class="card">
+      <div class="hint"><b>2) 対象入札の集計</b>（単価契約：合計は出しません）</div>
+      <div class="row">
+        <div class="col">
+          <label>入札番号（bidNo）</label>
+          <input id="txtBidNo" type="text" inputmode="latin" placeholder="例: 2026002" />
+          <div class="hint" style="margin-top:6px;">
+            URLの <span class="mono">?bidNo=XXXX</span> があれば優先。無ければ入力値を使用。
           </div>
-          <div style="padding-top:18px;">
+        </div>
+        <div class="col" style="min-width:260px;">
+          <div class="btnRow" style="margin-top:28px;">
             <button id="btnLoad" type="button" class="secondary">再読込</button>
+            <button id="btnCsv" type="button" class="secondary">CSV出力</button>
+            <button id="btnPrint" type="button" class="secondary">印刷</button>
           </div>
-          <div style="padding-top:18px;" class="btnRow">
-            <button id="btnViewItem" type="button">品目別ビュー</button>
-            <button id="btnViewBidder" type="button" class="secondary">入札者別ビュー</button>
-          </div>
-        </div>
-
-        <div class="btnRow" style="align-items:flex-end;">
-          <button id="btnPrint" type="button" class="secondary">印刷</button>
-          <button id="btnCsvItem" type="button" class="secondary">CSV（品目別）</button>
-          <button id="btnCsvBidder" type="button" class="secondary">CSV（入札者別）</button>
         </div>
       </div>
 
-      <div class="row" style="margin-top:8px;">
-        <label style="display:flex;gap:6px;align-items:center;">
-          <input id="chkHighlightMin" type="checkbox" checked>
-          最安ハイライト（同額最安も対象）
-        </label>
-        <label style="display:flex;gap:6px;align-items:center;">
-          <input id="chkHideEmptyBidders" type="checkbox">
-          全品目未入力の入札者列を隠す（重い場合に有効）
-        </label>
-        <label style="display:flex;gap:6px;align-items:center;">
-          <input id="chkHideEmptyRows" type="checkbox">
-          すべて未入力の品目行を隠す
-        </label>
+      <div class="hint" style="margin-top:8px;">
+        最安判定は「数値化できた単価だけ」で行います（空欄/文字は比較対象外）。小数OK。同額最安はすべてハイライト。
       </div>
-
-      <!-- メッセージ -->
-      <div class="card" id="msgBox" style="display:none;margin-top:10px;"></div>
     </div>
 
-    <!-- 品目別テーブル -->
-    <div class="card" id="cardItemView">
-      <div class="hint"><b>品目別ビュー</b>：行=品目／列=入札者（単価のみ）／右端=最安（数値化できたもののみ）</div>
-      <div class="tblwrap" style="margin-top:8px;">
-        <table>
-          <thead id="theadItem"></thead>
-          <tbody id="tbodyItem"></tbody>
+    <!-- 3) 集計結果 -->
+    <div class="card">
+      <div class="hint"><b>3) 集計結果</b></div>
+      <div class="tableWrap" style="margin-top:8px;">
+        <table id="tblSummary">
+          <thead id="theadSummary">
+            <tr>
+              <th class="stickyL" style="width:70px;">番号</th>
+              <th class="stickyL2" style="min-width:260px;">品名／規格</th>
+              <th style="min-width:120px;">予定数量</th>
+              <th style="min-width:160px;">（入札者列は読込後に生成）</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySummary">
+            <tr><td colspan="4" class="mono" style="color:#6b7280;">未読込</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
 
-    <!-- 入札者別テーブル -->
-    <div class="card" id="cardBidderView" style="display:none;">
-      <div class="hint"><b>入札者別ビュー</b>：行=入札者／列=品目（単価のみ）／末尾=入力率</div>
-      <div class="tblwrap" style="margin-top:8px;">
-        <table>
-          <thead id="theadBidder"></thead>
-          <tbody id="tbodyBidder"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ログ -->
-    <div class="card noprint">
-      <div class="row" style="align-items:center; justify-content:space-between;">
-        <div class="hint"><b>ログ</b>　操作ごとに成功/失敗/理由を必ず表示します。</div>
-        <div class="btnRow">
-          <button id="btnLogClear" type="button" class="secondary">ログクリア</button>
-          <button id="btnLogPause" type="button" class="secondary">ログ停止</button>
-          <button id="btnLogCopy" type="button" class="secondary">ログコピー</button>
-        </div>
-      </div>
-      <textarea id="txtLog" class="mono" readonly style="margin-top:8px;height:200px;width:100%;box-sizing:border-box;"></textarea>
-    </div>
-
-    <!-- バージョン一覧 -->
-    <div class="card noprint">
-      <div class="hint"><b>JSバージョン</b></div>
-      <pre id="preVerList" class="mono" style="white-space:pre-wrap;margin:6px 0 0 0;"></pre>
-    </div>
+    <div class="footer mono" id="lblFooter"></div>
   </div>
 
-  <!-- =========================================================
-       [JS-LOAD] 分割JS（01→07）
-     ========================================================= -->
-  <script src="js/01_summary_state.js"></script>
-  <script src="js/02_summary_log.js"></script>
-  <script src="js/03_summary_db.js"></script>
-  <script src="js/04_summary_render.js"></script>
-  <script src="js/05_summary_export.js"></script>
-  <script src="js/06_summary_print.js"></script>
-  <script src="js/07_summary_app.js"></script>
+  <!-- summary側だけで完結（/shared/なし） -->
+  <script src="js/00_summary_env.js"></script>
+  <script src="js/20_summary_app.js"></script>
 </body>
 </html>
