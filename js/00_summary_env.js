@@ -60,6 +60,7 @@
   var ALLOWED_ROLES = {
     admin: true,
     ope: true
+    operator: true   // ★追加：既存運用（operator）を許可
   };
 
   // ============================================================================
