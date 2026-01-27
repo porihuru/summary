@@ -184,7 +184,7 @@
       _state.docExists = true;
 
       var d = snap.data() || {};
-      var role = d.role || ""; // 期待: "admin" / "ope"
+      var role = d.role || ""; // 期待: "admin" / "ope" / "operator"
       _state.role = role;
 
       var ok = _allowedByRole(role);
@@ -196,7 +196,8 @@
         showMsg("ok", "権限OK", "role=" + role);
         L("role", "allowed role=" + role);
       }else{
-        showMsg("err", "権限なし", "role=" + role + " は許可されていません（admin/opeのみ）");
+        showMsg("err", "権限なし", "role=" + role + " は許可されていません（admin/ope/operatorのみ）");
+
         L("role", "denied role=" + role);
       }
 
