@@ -36,7 +36,7 @@
   // [APP-00] ファイル情報（バージョン一覧用）
   // ============================================================================
   var FILE = "12_summary_app.js";
-  var VER  = "v20260125-02";
+  var VER  = "v20260130-02";
   var TS   = (function(){ try{ return new Date().toISOString(); }catch(e){ return ""; } })();
 
   if(!window.__APP_VER__){ window.__APP_VER__ = []; }
@@ -150,9 +150,7 @@
     on("btnLogClear", function(){
       try{ if(window.SummaryLog && window.SummaryLog.clear) window.SummaryLog.clear(); }catch(e){}
     });
-    on("btnLogPause", function(){
-      setLogPaused(!logPaused);
-    });
+    
     on("btnLogCopy", function(){
       try{
         if(window.SummaryLog && window.SummaryLog.copyAll){
@@ -166,12 +164,7 @@
       }
     });
 
-    // ログ欄タップで自動停止
-    var ta = $("txtLog");
-    if(ta){
-      ta.addEventListener("pointerdown", function(){ setLogPaused(true); });
-      ta.addEventListener("touchstart", function(){ setLogPaused(true); });
-    }
+    
   }
 
   // ============================================================================
