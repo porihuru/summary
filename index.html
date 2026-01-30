@@ -294,9 +294,10 @@
        [JS] 個別JS（00→12の順）
        ※ 既に作成済みの前提（summary/js/ 配下）
      ========================================================= -->
-  <script src="js/00_summary_env.js"></script>
-  <script src="js/01_summary_dom.js"></script>
-  <script src="js/02_summary_log.js"></script>
+  
+<script src="js/00_summary_env.js"></script>
+  <script src="js/01_summary_boot.js"></script> <!-- ★ログ（SummaryLog） -->
+  <script src="js/02_summary_dom.js"></script>  <!-- ★DOMユーティリティ -->
   <script src="js/03_summary_msg.js"></script>
   <script src="js/04_summary_auth.js"></script>
   <script src="js/05_summary_role.js"></script>
@@ -307,6 +308,8 @@
   <script src="js/10_summary_csv.js"></script>
   <script src="js/11_summary_print.js"></script>
   <script src="js/12_summary_app.js"></script>
+
+
 
   <!-- =========================================================
        [UI-07] 版本表示補助（__APP_VER__ を #preVerList に反映）
