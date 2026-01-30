@@ -16,7 +16,7 @@
   // [ENV-00] ファイル情報（バージョン一覧用）
   // ============================================================================
   var FILE = "00_summary_env.js";
-  var VER  = "v20260125-01";
+  var VER  = "v20260130-01";
   var TS   = (function(){ try{ return new Date().toISOString(); }catch(e){ return ""; } })();
 
   if(!window.__APP_VER__){ window.__APP_VER__ = []; }
@@ -59,7 +59,7 @@
   // ============================================================================
   var ALLOWED_ROLES = {
     admin: true,
-    ope: true
+    ope: true,
     operator: true   // ★追加：既存運用（operator）を許可
   };
 
